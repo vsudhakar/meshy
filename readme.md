@@ -3,5 +3,5 @@
 Project by Visrut Sudhakar
 
 ##Python Dependencies to Install
-1) pymbobility
-2) python-rsa
+1. pymbobility
+2. python-rsa
