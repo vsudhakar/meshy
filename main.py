@@ -7,11 +7,13 @@ import random
 import rsa
 import hashlib
 
+latencyRecord = list()
+
 #Class which encapsulates any messages
 
 class networkMessage:
         def __init__(self,content,privkey,verification,pubkey):
-                self.encryptedContent = rsa.encrypt(content, privkey)
+                self.encryptedContent = rsa.encrypt(content, pubkey)
                 self.senderInfo = rsa.sign(verification, privkey, 'MD5')
                 m = hashlib.sha224()
                 m.update(self.encryptedContent)
@@ -35,34 +37,55 @@ class networkDevice:
                 self.randstep = random.randrange(3)
                 self.randcounter = 0
                 self.counter = 0
-                self.wirelessRestPeriod = 5
+                self.wirelessRestPeriod = 4
                 self.wirelessOnPeriod = 2
                 self.firstToggle = False
+                self.messageQueue = []
+
+                self.wireless = False
+                self.neighbors = []
+                self.location = (0,0)
+                self.addressBook = dict()
+                self.postboxStatus = False
+                self.subscriptions = []
+                self.postboxMessages = []
+                self.personalMessages = []
+                self.msearches = 2
+                
                 #raw_input("MAILBOX SEARCHES VAR HAS BEEN RESET!!!!!!")
 
         def next_step(self):
+                #Print out whether node is a mailbox
+##                print "Device", self.getName(), "has mailbox status", self.postboxStatus
+                
                 #Print out personal messages
-                print "Messages for device", self.getName()
+##                print "Messages for device", self.getName()
                 pmsgs = self.personalMessages
-                for i in pmsgs:
-                    print i.getContent(self.priv)
+##                for i in pmsgs:
+##                    print i.getContent(self.priv)
                 
 
                 #Print out mailbox messages
                 if self.postboxStatus:
-                    print "Mailbox messages by hash for device", self.getName()
+##                    print "Mailbox messages by hash for device", self.getName()
                     mailbox = self.getPostboxMessages()
-                    for i in mailbox:
-                        print i.getHash()
+##                    for i in mailbox:
+##                        print i.getHash()
 
                 #Print out message queue
-                print "Message queue for device", self.getName()
+##                print "Message queue for device", self.getName()
                 mqueue = self.messageQueue
-                for i in mqueue:
-                    print i.getHash()
+##                for i in mqueue:
+##                    print i.getHash()
 
-                print " __________ "
-                raw_input("Press Enter to Continue")
+                #Print out subscriptions
+##                print "Subscriptions for device", self.getName()
+                subs = self.getSubscriptions()
+##                for i in subs:
+##                        print i.getName()
+
+##                print " __________ "
+##                raw_input("Press Enter to Continue")
 
                 #--------------------------------------------------------------------------
             
@@ -76,7 +99,7 @@ class networkDevice:
                     self.counter += 1
                     if self.counter % self.wirelessOnPeriod == 0:
                         self.wirelessOff()
-                        self.counter == 0
+                        self.counter = 0
                 elif self.randcounter != self.randstep and self.firstToggle == False:
                     self.randcounter += 1
                     #print str(self.randcounter) + "/" + str(self.randstep)
@@ -95,7 +118,7 @@ class networkDevice:
 ##                6. Reset message queue
 ##                7. mailbox -> updatePostbox()
 
-                print "Mailbox search var:", self.mailboxSearches
+##                print "Mailbox search var:", self.mailboxSearches
     
                 self.wireless = True
 
@@ -104,12 +127,15 @@ class networkDevice:
                 self.pollSubscriptions()
 
                 m = self.getMsgQueue()
-                for i in m:
-                        for j in self.getSubscriptions():
-                                j.addToPostbox(i)
+                if len(self.getSubscriptions()) > 0:
+                        for i in m:
+                                for j in self.getSubscriptions():
+                                        j.addToPostbox(i)
 
-                #Reset message queue
-                self.messageQueue = []
+                        #Reset message queue
+                        self.messageQueue = []
+##                else:
+##                        print "No available mailboxes"
 
                 if self.postboxStatus:
                         self.updatePostbox()
@@ -124,6 +150,7 @@ class networkDevice:
         def getPublicKey(self):
                 return self.pub
         def generateMessage(self, content, friendly):
+                #__init__(self,content,privkey,verification,pubkey)
                 newMsg = networkMessage(content, self.priv, self.ver, self.addressBook[friendly])
                 self.messageQueue.append(newMsg)
                 return newMsg
@@ -177,13 +204,14 @@ class networkDevice:
                             #There are no man in the middle opportunities, you should become a mailbox
                             if self.mailboxSearches == 3:
                                 self.postboxStatus = True
-##                              raw_input("Became a mailbox!")
+                                #raw_input("Became a mailbox!")
                                 networkDevice.mailboxSearches = 0
                             else:
-                                #print "Previous mailboxvar", str(self.mailboxSearches)
+##                                print "Previous mailboxvar", str(self.mailboxSearches)
+                                #networkDevice.mailboxSearches += 1
                                 networkDevice.mailboxSearches += 1
 ##                                self.msearches = self.msearches + 1
-                                #print "Mailbox incremented to", str(self.mailboxSearches)
+##                                print "Mailbox incremented to", str(self.mailboxSearches)
 ##                                print "Other var is", str(self.msearches)
                             #print "Mailbox is", str(self.mailboxSearches)
 
@@ -227,8 +255,13 @@ class networkDevice:
                         #Delete the old list
                         full = []
 
+                        pmsgs = self.personalMessages
+                        pmsgsHashes = []
+                        for n in pmsgs:
+                                pmsgsHashes.append(n.getHash)
                         for n in personal:
-                                self.personalMessages.append(n)
+                                if n.getHash not in pmsgsHashes:
+                                        self.personalMessages.append(n)
                                             
                 #If you are a mailbox grab from your own
                 personal = []
@@ -273,22 +306,16 @@ class networkDevice:
                 return self.wireless
 
         def checkTestMessage(self, content):
-            for i in self.personalMessages:
+            pmsgs = self.personalMessages
+            for i in pmsgs:
                 #Check for the test message content
+##                print "Checking for content match"
+##                print i.getContent(self.priv)
+                #raw_input("!!!!!!!")
                 if i.getContent(self.priv) == content:
                     return True
             return False
 
-        wireless = False
-        neighbors = []
-        location = (0,0)
-        messageQueue = []
-        addressBook = dict()
-        postboxStatus = False
-        subscriptions = []
-        postboxMessages = []
-        personalMessages = []
-        msearches = 2
         mailboxSearches = 0
 
 #Class for network sandbox
@@ -372,6 +399,7 @@ class network:
                 #Associating two nodes
                 r1 = random.randrange(len(self.devices))
                 r2 = random.randrange(len(self.devices))
+                
                 while r2 == r1:
                     r2 = random.randrange(len(self.devices))
                 d1 = self.devices[r1]
@@ -381,25 +409,41 @@ class network:
 
                 #Initating message send from d1 to d2
 
-                print "ASSOCIATING NODES!!"
-                msg = d1.generateMessage("Hello world", d2.getName())
-                raw_input("Acknowledge to continue")
+##                print "ASSOCIATING NODES!!"
+                self.randcontent = str(random.randrange(10000))
+                msg = d1.generateMessage(self.randcontent, d2.getName())
+                #raw_input("Acknowledge to continue")
 
                 #Save devices
                 self.tD1 = d1
                 self.tD2 = d2
 
-                print "Generated message hash:", msg.getHash()
+##                print "Generated message hash:", msg.getHash()
+
 
         def latencyCheck(self):
             #Check if D2 has recieved the message
-            if self.tD2.checkTestMessage("Hello world") == False:
+            #raw_input("LATENCY CHECK!")
+##            print "Device name:", self.tD2.getName()
+##            print "Origin device name:", self.tD1.getName()
+            if self.tD2.checkTestMessage(self.randcontent) == False:
                 self.latencyCounter += 1
-                print "Didn't get it yet"
+##                print "Didn't get it yet"
             else:
                 print "Message recieved!"
+                for n in range(10):
+                        print "!!!!!!!!!!!!!"
                 print self.latencyCounter, " counts"
-                raw_input("Press enter to continue")
+                mailboxnum = 0
+                for i in self.devices:
+                        if i.postboxStatus:
+                                mailboxnum += 1
+                latencyRecord.append([self.latencyCounter, mailboxnum])
+                self.latencyCounter = 0
+                self.tD2.personalMessages = []
+                #raw_input("Press enter to continue")
+                self.testMessaging()
+            #raw_input("End latency check")
                 
         def cluster1(self):
                 #Cluster mode 1
@@ -433,18 +477,26 @@ class network:
 
 def supertest():
     net = network("Supertest", 5, (10,10))
-    for i in range(5):
+    net.testMessaging() 
+    for i in range(30):
         net.next_step(i)
+    print "Latency Record"
+    for i in latencyRecord:
+            print i
 
 def test():
         net = network("Test", 20, (70, 70))
         net.testMessaging()
         for i in range(100):
+                print i
                 net.next_step(i)
+        print "Latency Record"
+        for i in latencyRecord:
+                print i
 
 def hackensack1():
         net = network("Net", 9462, (3379.62,3379.2))
-
+        net.testMessaging()
         for i in range(10):
                 net.next_step(i)
                 print "Next", i
